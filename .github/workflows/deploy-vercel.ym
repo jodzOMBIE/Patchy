@@ -1,0 +1,64 @@
+name: Build wasm app and deploy to Vercel
+
+on:
+  workflow_dispatch: {}
+  # push:
+  #   branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - uses: actions/cache@v4
+        with: { path: .deps/emsdk, key: emsdk-4.0.7 }
+      - uses: actions/cache@v4
+        with: { path: .deps/Qt, key: qt-wasm-6.10.3 }
+      - uses: actions/cache@v4
+        with: { path: .deps/aqt-venv, key: aqt-venv-${{ runner.os }} }
+      - run: pwsh -File scripts/wasm/setup-emsdk.ps1
+      - run: pwsh -File scripts/wasm/setup-qt-wasm.ps1
+      - run: pwsh -File scripts/wasm/setup-qt-wasm.ps1 -WasmArch wasm_singlethread
+      - shell: cmd
+        run: |
+          call "%GITHUB_WORKSPACE%\.deps\emsdk\emsdk_env.bat" >nul 2>&1
+          call "%GITHUB_WORKSPACE%\scripts\vs-env.bat" -arch=x64 -host_arch=x64 >nul
+          cmake --preset wasm-release && cmake --build --preset wasm-release
+      - shell: cmd
+        run: |
+          call "%GITHUB_WORKSPACE%\.deps\emsdk\emsdk_env.bat" >nul 2>&1
+          call "%GITHUB_WORKSPACE%\scripts\vs-env.bat" -arch=x64 -host_arch=x64 >nul
+          cmake --preset wasm-release-st && cmake --build --preset wasm-release-st
+      - shell: pwsh
+        run: |
+          $repo = $PWD.Path
+          $siteDir = Join-Path $repo "build/package/wasm-site"
+          if (Test-Path $siteDir) { Remove-Item -Recurse -Force $siteDir }
+          New-Item -ItemType Directory -Force -Path $siteDir | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $siteDir "st") | Out-Null
+          foreach ($f in "patchy.js","patchy.wasm","patchy.data","qtloader.js") {
+            Copy-Item (Join-Path $repo "build/wasm-release/$f") (Join-Path $siteDir $f) -Force
+          }
+          foreach ($f in "patchy.js","patchy.wasm","patchy.data","qtloader.js") {
+            Copy-Item (Join-Path $repo "build/wasm-release-st/$f") (Join-Path $siteDir "st/$f") -Force
+          }
+          $cmakeText = Get-Content -Raw (Join-Path $repo "CMakeLists.txt")
+          $versionMatch = [regex]::Match($cmakeText, 'project\s*\([\s\S]*?VERSION\s+([0-9]+(?:\.[0-9]+){1,3})')
+          $version = if ($versionMatch.Success) { $versionMatch.Groups[1].Value } else { "0.0.0" }
+          $cacheTag = "$version-$(Get-Date -Format yyyyMMddHHmmss)"
+          $wasmSize = (Get-Item (Join-Path $siteDir "patchy.wasm")).Length
+          $wasmSizeSt = (Get-Item (Join-Path $siteDir "st/patchy.wasm")).Length
+          $template = Get-Content -Raw (Join-Path $repo "packaging/web/patchy.html.in")
+          $html = $template -replace '__PATCHY_VERSION__', $version -replace '__PATCHY_CACHE_TAG__', $cacheTag -replace '__PATCHY_WASM_SIZE_ST__', $wasmSizeSt -replace '__PATCHY_WASM_SIZE__', $wasmSize
+          Set-Content -Path (Join-Path $siteDir "patchy.html") -Value $html -NoNewline
+          Set-Content -Path (Join-Path $siteDir "index.html") -Value $html -NoNewline
+          Copy-Item (Join-Path $repo "vercel.json") (Join-Path $siteDir "vercel.json") -Force
+      - working-directory: build/package/wasm-site
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

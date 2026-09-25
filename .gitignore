@@ -1,67 +1,15 @@
-# Local dependency installs
-/.deps/
+# v0 sandbox internal files
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+.snowflake/
+.v0-trash/
+.vercel/
 
-# Checkout/developer-specific agent notes and remote build hosts (see AGENTS.md).
-# This repository is public: machine names, users, and credentials stay out of it.
-/agents_local.md
-/agents_secret.md
-/scripts/remote/hosts.local.json
+# Environment variables
+.env*.local
 
-# Testy compatibility-harness output and machine-local settings (see docs/testy.md)
-/testy/runs/
-/testy/cache/
-/testy/config.local.json
-/testy/corpus/
-__pycache__/
-
-# CMake and build output
-/build/
-/out/
-/install/
-/coverage/
-/test-artifacts/
-/local-test-fixtures/
-/Testing/
-/CMakeFiles/
-/CMakeCache.txt
-/CMakeUserPresets.json
-/cmake_install.cmake
-/CTestTestfile.cmake
-/DartConfiguration.tcl
-compile_commands.json
-*.ninja
-.ninja_*
-
-# IDE/editor state
-/.cache/
-/.vs/
-/.vscode/
-/.idea/
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
-
-# Logs
-*.log
-
-# Compiler/linker products
-*.obj
-*.o
-*.a
-*.lib
-*.dll
-*.dylib
-*.so
-*.exe
-*.ilk
-*.pdb
-*.exp
-*.manifest
-*.app/
-*.dSYM/
-
-# OS noise
+# Common ignores
+node_modules
+.next/
 .DS_Store
-Thumbs.db
-.claude
